@@ -2347,10 +2347,12 @@ begin
     varCurrency:
       AsCurrency := Value;
     varBoolean:
-      if Value then
-        AsVariant := VariantTrue
-      else
-        AsVariant := VariantFalse;
+      case sSQLType of
+        FB3_SQL_BOOLEAN: AsBoolean := Value;
+        else if Value then
+               AsVariant := VariantTrue else
+               AsVariant := VariantFalse;
+      end;
     varDate:
      case sSQLType of
       SQL_TYPE_TIME: AsTime:=Value;
@@ -2600,12 +2602,13 @@ begin
   Result := False;
   if not IsNull then
     case FXSQLVAR^.sqltype and (not 1) of
-      FB3_SQL_BOOLEAN,SQL_BOOLEAN,SQL_SHORT:
+      SQL_BOOLEAN,SQL_SHORT:
         Result := PShort(FXSQLVAR^.sqldata)^=ISC_TRUE;
       SQL_LONG:
        Result  := PLong(FXSQLVAR^.sqldata)^=ISC_TRUE;
       SQL_INT64:
        Result  := PInt64(FXSQLVAR^.sqldata)^=ISC_TRUE;
+      FB3_SQL_BOOLEAN: Result := PBoolean(FXSQLVAR^.sqldata)^ = True;
     else
         FIBError(feInvalidDataConversion, [nil])
     end;
@@ -3909,7 +3912,7 @@ begin
             );
           if (StatusVector^ = 1) and (isc_res > 0)
            and not CheckStatusVector([isc_bad_stmt_handle, isc_dsql_cursor_close_err]) then
-            IBError(Database.ClientLibrary,Self);
+            IBError(Database.ClientLibrary, Self, Database.NeedUnicodeFieldsTranslation);
         end;
       end;
       if Assigned(FMDTMainDataOrder) and FMDTMainDataOrder.Opened
@@ -3937,7 +3940,7 @@ begin
   if Transaction <> nil then
     Result := Transaction.Call(ErrCode, False);
   if (ErrCode > 0) and RaiseError then
-    IbError(Database.ClientLibrary,Self);
+    IbError(Database.ClientLibrary, Self, Database.NeedUnicodeFieldsTranslation);
 end;
 
 function TFIBQuery.Current: TFIBXSQLDA;
@@ -4693,7 +4696,7 @@ begin
         if Assigned(Database.SQLLogger)  and (lfQExecute in Database.SQLLogger.LogFlags) then
          DoLog;
         if (fetch_res <> 0) then
-         IbError(Database.ClientLibrary,Self) ;
+         IbError(Database.ClientLibrary, Self, Database.NeedUnicodeFieldsTranslation) ;
        FProcExecuted:=True;
       end;
       SQLCommit:
@@ -4993,7 +4996,7 @@ begin
             FEOF := True
            else
            try
-             IbError(FBase.Database.ClientLibrary,Self);
+             IbError(FBase.Database.ClientLibrary, Self, FBase.Database.NeedUnicodeFieldsTranslation);
            except
               Close;
               raise ;
@@ -5043,7 +5046,7 @@ begin
           False
         );
       if (StatusVector^ = 1) and (isc_res > 0) and (isc_res <> isc_bad_stmt_handle) then
-        IbError(Database.ClientLibrary,Self);
+        IbError(Database.ClientLibrary, Self, Database.NeedUnicodeFieldsTranslation);
       FEOF:=True;  
     end;
   finally
@@ -5417,7 +5420,7 @@ begin
 
     if isc_dsql_sql_info(StatusVector, @FHandle, 1, @info_request,
                          255, InfoBuffer) > 0 then
-      IbError(Database.ClientLibrary,Self);
+      IbError(Database.ClientLibrary, Self, Database.NeedUnicodeFieldsTranslation);
     if (InfoBuffer[0] = AnsiChar(isc_info_end)) then
      Exit;
     if (InfoBuffer[0] <> AnsiChar(isc_info_sql_records)) then
@@ -5431,7 +5434,7 @@ begin
      AllocAddr :=InfoBuffer;
      if isc_dsql_sql_info(StatusVector, @FHandle, 1, @info_request,
                          InfoLen, InfoBuffer) > 0 then
-      IbError(Database.ClientLibrary,Self);
+      IbError(Database.ClientLibrary, Self, Database.NeedUnicodeFieldsTranslation);
      Inc(InfoBuffer);
     end;
     Inc(InfoBuffer,2);
@@ -5979,7 +5982,7 @@ begin
      end;
     end;
  except
-   IbError(Database.ClientLibrary,Self)
+   IbError(Database.ClientLibrary, Self, Database.NeedUnicodeFieldsTranslation)
  end;
 end;
 
@@ -6256,7 +6259,7 @@ begin
                  FSQLParams.FXSQLDA
               ), False) > 0
              then
-               IbError(Database.ClientLibrary,Self)
+               IbError(Database.ClientLibrary, Self, Database.NeedUnicodeFieldsTranslation)
              else
              begin
               if (ParamsSQLDA=FUserSQLParams.FXSQLDA) then

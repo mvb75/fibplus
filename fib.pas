@@ -332,7 +332,7 @@ procedure FIBAlloc(var p; OldSize, NewSize: DWORD);
 procedure FIBError(ErrMess: TFIBClientError; const Args: array of const);
 procedure FIBErrorEx(const ErrMess:string; const Args: array of const);
 
-procedure IBError(ClientLibrary:IIbClientLibrary;Sender:TObject);
+procedure IBError(ClientLibrary:IIbClientLibrary; Sender:TObject; ANeedUnicodeTranslationMsg: Boolean = false);
 
 procedure RegisterErrorHandler(aErrorHandler:TComponent);
 procedure UnRegisterErrorHandler;
@@ -422,7 +422,7 @@ end;
  *  Examine the status vector, and raise an
  *  exception based on the current values in it.
  *)
-procedure IBError(ClientLibrary:IIbClientLibrary;Sender:TObject);
+procedure IBError(ClientLibrary:IIbClientLibrary; Sender:TObject; ANeedUnicodeTranslationMsg: Boolean);
 var
   sqlcode: Long;
 //  vFbSQLState : array[0..FB_sqlstate_bufSize-1] of AnsiChar;
@@ -492,12 +492,14 @@ begin
       begin
         if (tmpStr[1] >= 'a') and (tmpStr[1] <= 'z') then
          Dec(tmpStr[1],32);
-        vIBMessage:=vIBMessage+tmpStr;
+        if ANeedUnicodeTranslationMsg then
+         vIBMessage:=vIBMessage + UTF8ToString(tmpStr) else
+         vIBMessage:=vIBMessage + tmpStr;
         if (vIBMessage[Length(vIBMessage)] <> '.') then
           vIBMessage := vIBMessage + '.';
         vIBMessage := vIBMessage + CRLF;
       end;
-      L:= ClientLibrary.fb_Interpret(local_buffer, FIBHugeLocalBufferLength,@status_vector);
+      L:= ClientLibrary.fb_Interpret(local_buffer, FIBHugeLocalBufferLength, @status_vector);
     end;
   end;
   (*

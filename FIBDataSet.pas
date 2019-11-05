@@ -586,7 +586,7 @@ type
     EventInfo =Longint;
   {$ENDIF}
 
-
+  TFIBDatasetEvent = procedure (ADataset: TDataSet; AEvent: TDataEvent) of object;
 
   TFIBCustomDataSet = class({$IFDEF TWideDataSet}TWideDataset{$ELSE}TDataset{$ENDIF},ISQLObject,IFIBDataSet)
   protected
@@ -707,6 +707,12 @@ type
     FQBookMark      :TFIBQuery;
     FKeyFieldsForBookMark :TStrings;
     FSortFields:variant;
+
+    FOnFIBDatasetEvent: TFIBDatasetEvent;
+    FLockDatasetEventCount: Integer;
+    function GetLockDatasetEvent: Boolean;
+    procedure SetLockDatasetEvent(Value: Boolean);
+
     function  CanHaveLimitedCache:boolean;
 
     procedure SetCacheModelOptions(aCacheModelOptions:TCacheModelOptions);
@@ -1122,8 +1128,6 @@ type
     {$ENDIF}
     {$ENDIF}
 
-
-
     procedure Post; override;
     function  SetRecordPosInBuffer(NewPos:integer):integer;
 
@@ -1319,6 +1323,8 @@ type
 {END  ISQLObject }
 
   public
+    property LockDatasetEvent: Boolean read GetLockDatasetEvent write SetLockDatasetEvent;
+
     (*
      * Published properties implemented in TFIBCustomDataSet
      *)
@@ -1388,6 +1394,7 @@ type
   published
     property MDTSQLExecutor: TMDTSQLExecutor
       read FMDTSQLExecutor write SetMDTSQLExecutor default se_ServerAfterLocal;
+    property OnFIBDatasetEvent: TFIBDatasetEvent read FOnFIBDatasetEvent write FOnFIBDatasetEvent;
   end;
 
   TFIBDataSet = class(TFIBCustomDataSet)
@@ -5320,6 +5327,22 @@ begin
   Result := FQInsert.SQL;
 end;
 
+function TFIBCustomDataSet.GetLockDatasetEvent: Boolean;
+begin
+     Result := FLockDatasetEventCount > 0;
+end;
+
+procedure TFIBCustomDataSet.SetLockDatasetEvent(Value: Boolean);
+begin
+     if Value then
+      inc(FLockDatasetEventCount) else
+      begin
+        dec(FLockDatasetEventCount);
+        if FLockDatasetEventCount < 0 then
+         FLockDatasetEventCount := 0;
+      end;
+end;
+
 function TFIBCustomDataSet.GetParams: TFIBXSQLDA;
 begin
   Result := FQSelect.Params;
@@ -5382,14 +5405,10 @@ begin
    AutoCommitUpdateTransaction;
 end;
 
-
-
 {$DEFINE FIB_IMPLEMENT}
      {$I FIBDataSetLocate.inc}
 // ^^^^InternalLocate implement
 {$UNDEF FIB_IMPLEMENT}
-
-
 
 procedure TFIBCustomDataSet.CheckDataFields(FieldList:TList; const CallerProc:string);
 var
@@ -7088,7 +7107,10 @@ begin
  end;
  finally
   vNeedReloadClientBlobs:=False;
- end
+ end;
+
+ if Assigned(FOnFIBDatasetEvent) and not LockDatasetEvent  then
+  FOnFIBDatasetEvent(Self, Event);
 end;
 
 procedure TFIBCustomDataSet.SetStateFieldValue(State: TDataSetState; Field: TField;
